@@ -9,7 +9,7 @@
 ![Expanded AppBar](assets/img/1.png)
 
 ### Collapsed AppBar
-![Collapsed AppBar](assets/img/3.png)
+![Collapsed AppBar](assets/img/2.png)
 
 ### Max expended AppBar
 ![Animated Transition](assets/img/3.png)
