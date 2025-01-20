@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:nested_scroll_view_plus/nested_scroll_view_plus.dart';
 import 'package:telegram_ui/sliver_app_bar.dart';
+import 'package:telegram_ui/telegram_body.dart';
 
 void main() {
   runApp(const MyApp());
@@ -14,7 +15,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       darkTheme: ThemeData.dark(),
       themeMode: ThemeMode.dark,
-      home: TelegramStyleAppBar(),
+      home: const TelegramStyleAppBar(),
     );
   }
 }
@@ -26,257 +27,119 @@ class TelegramStyleAppBar extends StatefulWidget {
   _TelegramStyleAppBarState createState() => _TelegramStyleAppBarState();
 }
 
-class _TelegramStyleAppBarState extends State<TelegramStyleAppBar> {
-  final GlobalKey _appBarKey = GlobalKey();
-
+class _TelegramStyleAppBarState extends State<TelegramStyleAppBar>
+    with TickerProviderStateMixin {
   final ScrollController _scrollController = ScrollController();
 
-  double expandedHeight = 300.0;
-  double collapsedHeight = kToolbarHeight + 60;
+  late AnimationController _animationController;
+  late Animation<double> _sizeAnimation;
+
+  static const double kBaseHeight = kToolbarHeight;
+  static const double expandedHeight = kBaseHeight + 300.0;
+  static const double expandedMaxHeight = kBaseHeight + 450.0;
+  static const double collapsedHeight = kBaseHeight + 60.0;
+
+  bool isMaxHeight = false;
 
   @override
   void initState() {
-    // TODO: implement initState
+    super.initState();
 
-    WidgetsBinding.instance.addPostFrameCallback(
-      (timeStamp) {
-        print(_scrollController.position);
-        _scrollController.position.isScrollingNotifier.addListener(
-          () {
-            if (!_scrollController.position.isScrollingNotifier.value) {
-              _handleSnapScroll();
-            }
-          },
+    _animationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 300), // Более плавная анимация
+    );
+
+    _sizeAnimation = Tween<double>(
+      begin: expandedHeight,
+      end: expandedMaxHeight,
+    ).animate(CurvedAnimation(
+      parent: _animationController,
+      curve: Curves.easeInOut,
+    ));
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _scrollController.position.isScrollingNotifier.addListener(_onScrollEnd);
+    });
+  }
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _onScrollEnd() {
+    if (!_scrollController.position.isScrollingNotifier.value) {
+      _handleSnapScroll();
+    }
+  }
+
+  void _handleSnapScroll() {
+    double offset = _scrollController.offset;
+
+    double snapThreshold = (_sizeAnimation.value - collapsedHeight) / 2;
+
+    if (offset < snapThreshold) {
+      _animateScrollTo(0.0); // Раскрыть шапку
+    } else {
+      _animateScrollTo(expandedHeight - collapsedHeight); // Свернуть шапку
+    }
+  }
+
+  void _animateScrollTo(double offset) {
+    Future.microtask(
+      () {
+        _scrollController.animateTo(
+          offset,
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeInOut,
         );
       },
     );
-    super.initState();
   }
 
-  void _handleSnapScroll() async {
-    double offset = _scrollController.offset;
-    double snapThreshold = (expandedHeight - collapsedHeight) / 2;
+  void _updateAppBarHeight({required bool stretch}) {
+    if (isMaxHeight == stretch)
+      return; // Если состояние не меняется, ничего не делать.
 
-    // Проверка, на какой позиции находится скролл
-    if (offset < snapThreshold) {
-      // Скрол до раскрытой шапки
+    isMaxHeight = stretch;
 
-      Future.microtask(
-        () {
-          _scrollController.animateTo(
-            0.0,
-            duration: const Duration(milliseconds: 200),
-            curve: Curves.easeInOut,
-          );
-        },
-      );
-    } else if (offset < expandedHeight - collapsedHeight) {
-      // Скролл до свернутой шапки
-
-      Future.microtask(
-        () {
-          _scrollController.animateTo(
-            expandedHeight - collapsedHeight,
-            duration: const Duration(milliseconds: 200),
-            curve: Curves.easeInOut,
-          );
-        },
-      );
+    if (stretch) {
+      _animationController.forward(); // Увеличение высоты
+    } else {
+      _animationController.reverse(); // Уменьшение высоты
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // backgroundColor: Colors.black,
-
       body: CustomScrollView(
         controller: _scrollController,
         slivers: [
-          SliverPersistentHeader(
-            key: _appBarKey,
-            pinned: true,
-            delegate: TelegramProfileAppBar(
-                maxExtent: expandedHeight, minExtent: collapsedHeight),
+          AnimatedBuilder(
+            animation: _sizeAnimation,
+            builder: (context, child) {
+              return SliverPersistentHeader(
+                pinned: true,
+                delegate: TelegramProfileAppBar(
+                  isMaxOpened: isMaxHeight,
+                  onScrollDown: () => _updateAppBarHeight(stretch: false),
+                  onStretch: () => _updateAppBarHeight(stretch: true),
+                  maxExtent: _sizeAnimation.value,
+                  minExtent: collapsedHeight,
+                ),
+              );
+            },
           ),
           SliverList(
-              delegate: SliverChildListDelegate([
-            TelegramGroupTileWidget(
-              children: [
-                SizedBox(
-                  height: 16,
-                ),
-                TelegramTileWidget(
-                  icon: Icon(Icons.star),
-                  title: 'Описание',
-                ),
-                TelegramTileWidget(
-                  icon: Icon(Icons.star),
-                  title: 'Описание',
-                )
-              ],
-            ),
-            TelegramGroupTileWidget(
-              children: [
-                TelegramTileWidget(
-                  icon: Icon(Icons.star),
-                  title: 'Описание',
-                ),
-              ],
-            ),
-            TelegramGroupTileWidget(
-              children: [
-                TelegramTileWidget(
-                  icon: Icon(Icons.star),
-                  title: 'Описание',
-                ),
-              ],
-            ),
-            TelegramGroupTileWidget(
-              children: [
-                TelegramTileWidget(
-                  icon: Icon(Icons.star),
-                  title: 'Описание',
-                ),
-                TelegramTileWidget(
-                  icon: Icon(Icons.star),
-                  title: 'Описание',
-                ),
-                TelegramTileWidget(
-                  icon: Icon(Icons.star),
-                  title: 'Описание',
-                ),
-                TelegramTileWidget(
-                  icon: Icon(Icons.star),
-                  title: 'Описание',
-                )
-              ],
-            ),
-            TelegramGroupTileWidget(
-              children: [
-                TelegramTileWidget(
-                  icon: Icon(Icons.star),
-                  title: 'Описание',
-                ),
-                TelegramTileWidget(
-                  icon: Icon(Icons.star),
-                  title: 'Описание',
-                ),
-                TelegramTileWidget(
-                  icon: Icon(Icons.star),
-                  title: 'Описание',
-                ),
-                TelegramTileWidget(
-                  icon: Icon(Icons.star),
-                  title: 'Описание',
-                ),
-                TelegramTileWidget(
-                  icon: Icon(Icons.star),
-                  title: 'Описание',
-                ),
-                TelegramTileWidget(
-                  icon: Icon(Icons.star),
-                  title: 'Описание',
-                )
-              ],
-            ),
-            TelegramGroupTileWidget(
-              children: [
-                TelegramTileWidget(
-                  icon: Icon(Icons.star),
-                  title: 'Описание',
-                ),
-                TelegramTileWidget(
-                  icon: Icon(Icons.star),
-                  title: 'Описание',
-                ),
-                TelegramTileWidget(
-                  icon: Icon(Icons.star),
-                  title: 'Описание',
-                ),
-                TelegramTileWidget(
-                  icon: Icon(Icons.star),
-                  title: 'Описание',
-                )
-              ],
-            ),
-            TelegramGroupTileWidget(
-              children: [
-                TelegramTileWidget(
-                  icon: Icon(Icons.star),
-                  title: 'Описание',
-                ),
-                TelegramTileWidget(
-                  icon: Icon(Icons.star),
-                  title: 'Описание',
-                ),
-                TelegramTileWidget(
-                  icon: Icon(Icons.star),
-                  title: 'Описание',
-                )
-              ],
-            )
-          ]))
+            delegate: SliverChildListDelegate([
+              const TelegramSettingsList(),
+            ]),
+          ),
         ],
-      ),
-    );
-  }
-}
-
-class TelegramGroupTileWidget extends StatelessWidget {
-  final List<Widget> children;
-  const TelegramGroupTileWidget({super.key, required this.children});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-      child: ClipRRect(
-        clipBehavior: Clip.hardEdge,
-        borderRadius: BorderRadiusDirectional.circular(12),
-        child: Column(
-          children: children,
-        ),
-      ),
-    );
-  }
-}
-
-class TelegramTileWidget extends StatelessWidget {
-  final Widget icon;
-  final String title;
-  const TelegramTileWidget(
-      {super.key, required this.icon, required this.title});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(color: const Color.fromARGB(255, 23, 23, 23)),
-      child: Padding(
-        padding: const EdgeInsets.all(8.0),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            icon,
-            SizedBox(
-              width: 8,
-            ),
-            Expanded(
-              child: Row(
-                children: [
-                  Text(
-                    title,
-                    style: TextStyle(fontSize: 18),
-                  ),
-                ],
-              ),
-            ),
-            Icon(
-              Icons.arrow_forward_ios_rounded,
-              size: 16,
-            )
-          ],
-        ),
       ),
     );
   }

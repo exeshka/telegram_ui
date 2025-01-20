@@ -1,15 +1,25 @@
+import 'dart:developer';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 
 class TelegramProfileAppBar extends SliverPersistentHeaderDelegate {
+  final void Function() onStretch;
+  final void Function() onScrollDown;
+  final bool isMaxOpened;
+
   @override
   final double maxExtent;
   @override
   final double minExtent;
 
-  TelegramProfileAppBar({required this.maxExtent, required this.minExtent});
+  TelegramProfileAppBar(
+      {required this.onStretch,
+      required this.isMaxOpened,
+      required this.onScrollDown,
+      required this.maxExtent,
+      required this.minExtent});
 
   @override
   Widget build(
@@ -17,6 +27,12 @@ class TelegramProfileAppBar extends SliverPersistentHeaderDelegate {
     // Параметры для расчета анимации
     double maxScale = 1.6;
     double minScale = 0.9;
+
+    log(shrinkOffset.toString());
+
+    if (shrinkOffset > 0 && maxExtent > 350) {
+      onScrollDown();
+    }
 
     // Плавное изменение масштабирования
     double currentScale = maxScale - (shrinkOffset / maxExtent) * 2;
@@ -111,20 +127,25 @@ class TelegramProfileAppBar extends SliverPersistentHeaderDelegate {
             )),
 
         // Красный круг, движущийся вниз
-        Positioned(
-          bottom: containerBottom,
+        AnimatedPositioned(
+          duration: Duration(milliseconds: 150),
+          bottom: isMaxOpened ? 0 : containerBottom,
           left: 0,
           right: 0,
+          top: isMaxOpened ? 0 : null,
           child: Opacity(
             opacity: disappearingTextOpacity,
             child: Transform.scale(
-              scale: 1 - avatarSize,
+              scale: isMaxOpened ? 1 : 1 - avatarSize,
               child: Center(
-                child: Container(
-                  height: 140,
-                  width: 140,
+                child: AnimatedContainer(
+                  duration: Duration(milliseconds: 150),
+                  height: isMaxOpened ? null : 140,
+                  width: isMaxOpened ? null : 140,
                   decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(80),
+                    borderRadius: isMaxOpened
+                        ? BorderRadius.circular(0)
+                        : BorderRadius.circular(80),
                     color: Colors.black,
                   ),
                 ),
@@ -135,10 +156,11 @@ class TelegramProfileAppBar extends SliverPersistentHeaderDelegate {
 
         // Текст, который перемещается и масштабируется
 
-        Positioned(
+        AnimatedPositioned(
+          duration: Duration(milliseconds: 100),
           bottom: textBottom,
-          left: 0,
-          right: 0,
+          left: 46,
+          right: isMaxOpened ? null : 46,
           child: Center(
             child: Transform.scale(
               scale: currentScale,
@@ -155,10 +177,11 @@ class TelegramProfileAppBar extends SliverPersistentHeaderDelegate {
         ),
 
         // Текст, который исчезает
-        Positioned(
+        AnimatedPositioned(
+          duration: Duration(milliseconds: 400),
           bottom: 30,
-          left: 0,
-          right: 0,
+          left: 32,
+          right: isMaxOpened ? null : 32,
           child: Center(
             child: Opacity(
               opacity: disappearingTextOpacity,
@@ -181,7 +204,9 @@ class TelegramProfileAppBar extends SliverPersistentHeaderDelegate {
 
   @override
   OverScrollHeaderStretchConfiguration? get stretchConfiguration =>
-      OverScrollHeaderStretchConfiguration();
+      OverScrollHeaderStretchConfiguration(
+        onStretchTrigger: () async => onStretch(),
+      );
 
   @override
   bool shouldRebuild(covariant SliverPersistentHeaderDelegate oldDelegate) {
