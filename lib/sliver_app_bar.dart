@@ -188,7 +188,7 @@ class TelegramProfileAppBar extends SliverPersistentHeaderDelegate {
               child: Transform.scale(
                 scale: currentScale - 0.2,
                 child: Text(
-                  "@exeshka",
+                  "@exeshkaa",
                   style: TextStyle(
                     fontSize: 14,
                     color: Colors.white.withOpacity(0.6),
